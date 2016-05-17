@@ -24,9 +24,13 @@ async def init(loop):
     return srv
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(init(loop))
-#暂时先不对服务器进行复杂的处理
+srv = loop.run_until_complete(init(loop))
+#主要问题是loop在连接都确定退出前就关闭了，报RuntimeError
 try:
     loop.run_forever()
 except KeyboardInterrupt:
     pass
+finally:
+    srv.close()
+    loop.run_until_complete(srv.wait_closed())
+loop.close()
