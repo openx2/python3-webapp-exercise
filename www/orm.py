@@ -9,7 +9,7 @@ import aiomysql
 
 def log(sql,args=()):
     '''日志记录函数'''
-    logging.info('SQL: %s' % sql)
+    logging.info('SQL: %s , %s' % (sql, str(args)))
 
 async def create_pool(loop,**kw):
     '''创建数据库连接池，默认情况下主机为localhost,端口号为3306,
@@ -28,6 +28,13 @@ async def create_pool(loop,**kw):
         minsize = kw.get('minsize',1),
         loop = loop
     )
+
+async def close_pool():
+    '''异步关闭连接池'''
+    logging.info('close database connection pool...')
+    global __pool
+    __pool.close()
+    await __pool.wait_closed()
 
 async def select(sql,args,size=None):
     '''执行sql所描述的select语句，args用于取代sql中的占位符，
@@ -51,7 +58,7 @@ async def select(sql,args,size=None):
 
 async def execute(sql,args):
     '''执行sql所描述的insert,update,delete语句，args用于取代sql中的占位符'''
-    log(sql)
+    log(sql, args)
     global __pool
     with (await __pool) as conn:
         try:
@@ -59,7 +66,7 @@ async def execute(sql,args):
             await cur.execute(sql.replace('?','%s'),args)
             affected = cur.rowcount
             await cur.close()
-        except BaseExceptioin as e: #捕获到任何异常，都直接向外抛出
+        except BaseException as e: #捕获到任何异常，都直接向外抛出
             raise
     #返回的是执行语句时影响的行数
     return affected
@@ -138,7 +145,7 @@ class ModelMetaClass(type):
         #从类属性中删除Field属性，避免冲突
         for k in mappings:
             attrs.pop(k)
-        escaped_fields = list(map(lambda f: '`%s`' % f), fields) #属性列转义
+        escaped_fields = list(map(lambda f: '`%s`' % f, fields)) #属性列转义
         attrs['__mappings__'] = mappings         #保存属性和列的映射关系
         attrs['__table__'] = tableName
         attrs['__primary_key__'] = primaryKey    #主键属性名
@@ -146,11 +153,11 @@ class ModelMetaClass(type):
         #构造默认的SELECT、INSERT、UPDATE、DELETE语句
         attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey,\
                                          ', '.join(escaped_fields), tableName)
-        attrs['__insert__'] = 'insert into `%s` (`%s`, %s) values (%s)' % \
-                        (tableName, primaryKey, ', '.join(escaped_fields), \
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % \
+                        (tableName, ', '.join(escaped_fields), primaryKey, \
                                                         '?, '*len(fields)+'?')
         attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (tableName,\
-                       '. '.join(map(lambda f: '`%s`=?' % mappings.get(f).name\
+                       ', '.join(map(lambda f: '`%s`=?' % mappings.get(f).name\
                                                     or f, fields)), primaryKey)
         attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, \
                                                                     primaryKey)

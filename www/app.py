@@ -17,21 +17,29 @@ async def init(loop):
     app = web.Application(loop=loop)
     #给app添加路径映射，把'/'映射到index函数上处理
     app.router.add_route('GET', '/', index)
+    #通过应用创建处理请求的句柄
+    handler = app.make_handler()
     #利用loop实例化app的协程处理，主机名为localhost，端口号为9000
-    srv = await loop.create_server(app.make_handler(), 'localhost', 9000)
+    srv = await loop.create_server(handler, 'localhost', 9000)
     logging.info('server started at http://127.0.0.1:9000...')
-    #返回的server目前没有使用，但可以在服务器退出时用到
-    return srv
+    #创建结果集，以便在外界正常关闭服务器
+    rs = { 'app': app, 'srv': srv, 'handler': handler }
+    return rs
 
 loop = asyncio.get_event_loop()
-srv = loop.run_until_complete(init(loop))
-#主要问题是loop在连接都确定退出前就关闭了，报RuntimeError
-#可以参考http://aiohttp.readthedocs.io/en/stable/web.html#aiohttp-web-graceful-shutdown
+rs = loop.run_until_complete(init(loop))
 try:
     loop.run_forever()
 except KeyboardInterrupt:
     pass
 finally:
-    srv.close()
-    loop.run_until_complete(srv.wait_closed())
+    #停止接受新客户端进行连接
+    rs['srv'].close()
+    loop.run_until_complete(rs['srv'].wait_closed())
+    #执行Application.shutdown()事件
+    loop.run_until_complete(rs['app'].shutdown())
+    #关闭已经接受的连接，60.0s被视为一个合理的超时等待值
+    loop.run_until_complete(rs['handler'].finish_connections(60.0))
+    #通过Application.clearup()调用注册的应用终结器(finalizer)
+    loop.run_until_complete(rs['app'].cleanup())
 loop.close()
