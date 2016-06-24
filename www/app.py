@@ -26,20 +26,21 @@ async def init(loop):
     rs = { 'app': app, 'srv': srv, 'handler': handler }
     return rs
 
-loop = asyncio.get_event_loop()
-rs = loop.run_until_complete(init(loop))
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    pass
-finally:
-    #停止接受新客户端进行连接
-    rs['srv'].close()
-    loop.run_until_complete(rs['srv'].wait_closed())
-    #执行Application.shutdown()事件
-    loop.run_until_complete(rs['app'].shutdown())
-    #关闭已经接受的连接，60.0s被视为一个合理的超时等待值
-    loop.run_until_complete(rs['handler'].finish_connections(60.0))
-    #通过Application.clearup()调用注册的应用终结器(finalizer)
-    loop.run_until_complete(rs['app'].cleanup())
-loop.close()
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    rs = loop.run_until_complete(init(loop))
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        #停止接受新客户端进行连接
+        rs['srv'].close()
+        loop.run_until_complete(rs['srv'].wait_closed())
+        #执行Application.shutdown()事件
+        loop.run_until_complete(rs['app'].shutdown())
+        #关闭已经接受的连接，60.0s被视为一个合理的超时等待值
+        loop.run_until_complete(rs['handler'].finish_connections(60.0))
+        #通过Application.clearup()调用注册的应用终结器(finalizer)
+        loop.run_until_complete(rs['app'].cleanup())
+    loop.close()
