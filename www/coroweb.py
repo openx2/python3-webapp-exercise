@@ -11,6 +11,9 @@ from aiohttp import web
 
 from apis import APIError
 
+#get和post为装饰器，用于处理HTTP的GET、POST请求方式
+#__method__属性对应相应请求方式，表示装饰的函数处理这种请求
+#__route__属性对应主机中的路径，表示访问哪个路径时调用函数
 def get(path):
     '''Define decorator @get('/path')'''
     def decorator(func):
@@ -33,7 +36,15 @@ def post(path):
         return wrapper
     return decorator
 
+#inspect.Parameter中有5种kind：
+#POSITIONAL_ONLY                只能是位置参数
+#POSITIONAL_OR_KEYWORD          可以是位置参数，也可以是关键字参数
+#VAR_POSITIONAL                 相当于是*arg
+#KEYWORD_ONLY                   关键字参数，相当于*,key
+#VAR_KEYWORD                    相当于**kw
+
 def get_required_kw_args(fn):
+    '''得到url处理函数需要的默认值为空的所有关键字参数'''
     args = []
     params = inspect.signature(fn).parameters
     for name, param in params.items():
@@ -43,6 +54,7 @@ def get_required_kw_args(fn):
     return tuple(args)
 
 def get_named_kw_args(fn):
+    '''得到url处理函数需要的所有关键字参数'''
     args = []
     params = inspect.signature(fn).parameters
     for name, param in params.items():
@@ -51,18 +63,21 @@ def get_named_kw_args(fn):
     return tuple(args)
 
 def has_named_kw_args(fn):
+    '''检查函数是否需要关键字参数'''
     params = inspect.signature(fn).parameters
     for param in params.values():
         if param.kind == inspect.Parameter.KEYWORD_ONLY:
             return True
 
 def has_var_kw_arg(fn):
+    '''如果url处理函数的参数有**kw,返回true'''
     params = inspect.signature(fn).parameters
     for param in params.values():
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             return True
 
 def has_request_arg(fn):
+    '''如果url处理函数的参数有request，返回True'''
     sig = inspect.signature(fn)
     params = sig.parameters
     found = False
@@ -70,6 +85,7 @@ def has_request_arg(fn):
         if name == 'request':
             found = True
             continue
+        #如果找到了request参数，那么之后的参数只能是*args,**kw,或*,key这样的关键字参数
         if found and (param.kind != inspect.Parameter.VAR_POSITIONAL and\
                           param.kind != inspect.Parameter.KEYWORD_ONLY and\
                               param.kind != inspect.Parameter.VAR_KEYWORD):
@@ -145,11 +161,13 @@ class RequestHandler(object):
                 return dict(error=e.error, data=e.data, message=e.message)
 
 def add_static(app):
+    '''添加静态页面处理'''
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
     app.router.add_static('/static/', path)
     logging.info('add static %s => %s' % ('/static/', path))
 
 def add_route(app, fn):
+    '''将函数用RequestHandler进行包装，添加到相应路径'''
     method = getattr(fn, '__method__', None)
     path = getattr(fn, '__route__', None)
     if path is None or method is None:
@@ -162,6 +180,7 @@ def add_route(app, fn):
     app.router.add_route(method, path, RequestHandler(app, fn))
 
 def add_routes(app, module_name):
+    '''将一个模块中所有函数映射到路径上'''
     mod = importlib.import_module(module_name)
     for attr in dir(mod):
         if attr.startswith('_'):
