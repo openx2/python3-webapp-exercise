@@ -6,7 +6,6 @@ __author__ = 'cx'
 import asyncio, inspect, logging, functools, importlib, os
 
 from urllib import parse
-
 from aiohttp import web
 
 from apis import APIError
