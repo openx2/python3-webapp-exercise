@@ -58,6 +58,7 @@ async def response_factory(app, handler):
                 resp = web.Response(body=json.dumps(r, ensure_ascii=False,
                                 default=lambda o: o.__dict__).encode('utf-8'))
                 resp.content_type = 'application/json;charset=utf-8'
+                return resp
             else:
                 #如果有'__template__'为key的值，则说明要使用jinja2的模板，template就是模板的名字
                 resp = web.Response(
