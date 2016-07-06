@@ -3,7 +3,7 @@
 
 __author__ = 'cx'
 
-import time
+import time, logging
 
 from coroweb import get, post
 from models import User, Blog, Comment
@@ -20,3 +20,11 @@ async def index(request):
         '__template__': 'blogs.html',
         'blogs': blogs
     }
+
+@get('/api/users')
+async def api_get_users():
+    users = await User.findAll(orderBy='create_at desc')
+    logging.info('users = %s and type = %s' % (users, type(users)))
+    for u in users:
+        u.passwd = '******'
+    return dict(users=users)
