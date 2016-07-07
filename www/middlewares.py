@@ -7,9 +7,11 @@ __author__ = 'cx'
 middlewares used by the application
 '''
 
+import pdb
 import asyncio, logging, json
 
 from aiohttp import web
+from handlers import cookie2user, COOKIE_NAME
 
 async def logger_factory(app, handler):
     async def logger(request):
@@ -60,6 +62,7 @@ async def response_factory(app, handler):
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
             else:
+                r['__user__'] = request.__user__
                 #如果有'__template__'为key的值，则说明要使用jinja2的模板，template就是模板的名字
                 resp = web.Response(
                     body=app['__templating__'].get_template(template).
@@ -83,3 +86,16 @@ async def response_factory(app, handler):
             resp.content_type = 'text/plain;charset=utf-8'
             return resp
     return response
+
+async def auth_factory(app, handler):
+    async def auth(request):
+        logging.info('check user: %s %s' % (request.method, request.path))
+        request.__user__ = None
+        cookie_str = request.cookies.get(COOKIE_NAME)
+        if cookie_str:
+            user = await cookie2user(cookie_str)
+            if user:
+                logging.info('set current user: %s' % user.email)
+                request.__user__ = user
+        return (await handler(request))
+    return auth

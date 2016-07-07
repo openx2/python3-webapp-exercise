@@ -15,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader
 import orm
 from config import configs
 from coroweb import add_routes, add_static
-from middlewares import logger_factory, response_factory
+from middlewares import logger_factory, response_factory, auth_factory
 
 def init_jinja2(app, **kw):
     '''得到所需的jinja2配置，进行初始化'''
@@ -66,7 +66,7 @@ async def init(loop):
     await orm.create_pool(loop=loop,**configs.db)
     #创建能处理1次HTTP请求的应用，loop为处理请求的协程，添加中间件
     app = web.Application(loop=loop,
-                         middlewares=[logger_factory, response_factory])
+                  middlewares=[logger_factory, auth_factory, response_factory])
     #初始化jinja2框架
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     #添加请求的handlers，即各请求相应的处理函数
