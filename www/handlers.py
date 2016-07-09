@@ -7,7 +7,7 @@ import hashlib, logging, re, json, time
 
 from aiohttp import web
 
-from apis import APIError, APIValueError
+from apis import APIError, APIValueError, APIPermissionError, Page
 from coroweb import get, post
 from models import User, Blog, Comment, next_id
 from config import configs
@@ -24,14 +24,6 @@ async def index(request):
         '__template__': 'blogs.html',
         'blogs': blogs
     }
-
-@get('/api/users')
-async def api_get_users():
-    users = await User.findAll(orderBy='create_at desc')
-    logging.info('users = %s and type = %s' % (users, type(users)))
-    for u in users:
-        u.passwd = '******'
-    return dict(users=users)
 
 @get('/register')
 def register():
@@ -53,13 +45,49 @@ def signout(request):
     logging.info('user signed out.')
     return r
 
+@get('/api/users')
+async def api_get_users():
+    users = await User.findAll(orderBy='create_at desc')
+    logging.info('users = %s and type = %s' % (users, type(users)))
+    for u in users:
+        u.passwd = '******'
+    return dict(users=users)
+
+@get('/api/blogs')
+async def api_blogs(*, page='1'):
+    page_index = get_page_index(page)
+    num = await Blog.findNumber('count(id)')
+    p = Page(num, page_index)
+    if num == 0:
+        return dict(page=p, blogs=())
+    blogs = await Blog.findAll(orderBy='create_at desc', limit=(p.offset,
+                                                                   p.limit))
+    return dict(page=p, blogs=blogs)
+
+@get('/manage/blogs')
+def manage_blogs(*, page='1'):
+    return {
+        '__template__': 'manage_blogs.html',
+        'page_index': get_page_index(page)
+    }
+
 @get('/manage/blogs/create')
 def manage_create_blog():
     return {
         '__template__': 'manage_blog_edit.html',
-        'id':'',
-        'action':'/api/blogs'
+        'id': '',
+        'action': '/api/blogs'
     }
+
+def get_page_index(page_str):
+    p = 1
+    try:
+        p = int(page_str)
+    except ValueError:
+        pass
+    if p < 1:
+        p = 1
+    return p
 
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
